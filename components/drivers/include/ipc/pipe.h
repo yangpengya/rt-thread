@@ -24,6 +24,7 @@ struct rt_pipe_device
     rt_bool_t is_named;
 #ifdef RT_USING_POSIX_DEVIO
     int pipeno; /* for unamed pipe */
+    struct rt_condvar waitfor_parter;
 #endif
 
     /* ring buffer in pipe device */
@@ -35,7 +36,6 @@ struct rt_pipe_device
     int writer;
     int reader;
 
-    struct rt_condvar waitfor_parter;
     struct rt_mutex lock;
 };
 typedef struct rt_pipe_device rt_pipe_t;

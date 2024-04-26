@@ -15,7 +15,6 @@
 #include <rtdevice.h>
 #include <stdint.h>
 #include <sys/errno.h>
-#include <ipc/condvar.h>
 
 #if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_POSIX_PIPE)
 #include <unistd.h>
@@ -24,6 +23,7 @@
 #include <sys/ioctl.h>
 #include <dfs_file.h>
 #include <resource_id.h>
+#include <ipc/condvar.h>
 
 /* check RT_UNAMED_PIPE_NUMBER */
 
@@ -557,7 +557,7 @@ rt_ssize_t rt_pipe_write(rt_device_t device, rt_off_t pos, const void *buffer, r
     }
 
     pbuf = (uint8_t*)buffer;
-    rt_mutex_take(&pipe->lock, -1);
+    rt_mutex_take(&pipe->lock, RT_WAITING_FOREVER);
 
     while (write_bytes < count)
     {
@@ -619,6 +619,14 @@ rt_pipe_t *rt_pipe_create(const char *name, int bufsz)
     rt_pipe_t *pipe;
     rt_device_t dev;
 
+    RT_ASSERT(name);
+    RT_ASSERT(bufsz < 0xFFFF);
+
+    if (rt_device_find(name) != RT_NULL)
+    {
+        /* pipe device has been created */
+        return RT_NULL;
+    }
     pipe = (rt_pipe_t *)rt_malloc(sizeof(rt_pipe_t));
     if (pipe == RT_NULL) return RT_NULL;
 
@@ -626,16 +634,15 @@ rt_pipe_t *rt_pipe_create(const char *name, int bufsz)
     pipe->is_named = RT_TRUE; /* initialize as a named pipe */
 #if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_POSIX_PIPE)
     pipe->pipeno = -1;
+    rt_condvar_init(&pipe->waitfor_parter, "piwfp");
 #endif
     rt_mutex_init(&pipe->lock, name, RT_IPC_FLAG_FIFO);
     rt_wqueue_init(&pipe->reader_queue);
     rt_wqueue_init(&pipe->writer_queue);
-    rt_condvar_init(&pipe->waitfor_parter, "piwfp");
 
     pipe->writer = 0;
     pipe->reader = 0;
 
-    RT_ASSERT(bufsz < 0xFFFF);
     pipe->bufsz = bufsz;
 
     dev = &pipe->parent;
@@ -654,15 +661,8 @@ rt_pipe_t *rt_pipe_create(const char *name, int bufsz)
     dev->rx_indicate = RT_NULL;
     dev->tx_complete = RT_NULL;
 
-    if (rt_device_register(&pipe->parent, name, RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_REMOVABLE) != 0)
-    {
-        rt_mutex_detach(&pipe->lock);
-#if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_POSIX_PIPE)
-        resource_id_put(&id_mgr, pipe->pipeno);
-#endif
-        rt_free(pipe);
-        return RT_NULL;
-    }
+    rt_device_register(&pipe->parent, name, RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_REMOVABLE);
+
 #if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_POSIX_PIPE)
     dev->fops = (void *)&pipe_fops;
 #endif
@@ -683,44 +683,34 @@ rt_pipe_t *rt_pipe_create(const char *name, int bufsz)
  */
 int rt_pipe_delete(const char *name)
 {
-    int result = 0;
     rt_device_t device;
+    rt_pipe_t *pipe;
 
     device = rt_device_find(name);
-    if (device)
+    if (device == RT_NULL || device->type != RT_Device_Class_Pipe)
     {
-        if (device->type == RT_Device_Class_Pipe)
-        {
-            rt_pipe_t *pipe;
+        /* pipe device not found */
+        return -ENODEV;
+    }
 
-            pipe = (rt_pipe_t *)device;
+    pipe = (rt_pipe_t *)device;
 
-            rt_condvar_detach(&pipe->waitfor_parter);
-            rt_mutex_detach(&pipe->lock);
+    rt_mutex_detach(&pipe->lock);
 #if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_POSIX_PIPE)
-            resource_id_put(&id_mgr, pipe->pipeno);
+    rt_condvar_detach(&pipe->waitfor_parter);
+    resource_id_put(&id_mgr, pipe->pipeno);
 #endif
-            rt_device_unregister(device);
+    rt_device_unregister(device);
 
-            /* close fifo ringbuffer */
-            if (pipe->fifo)
-            {
-                rt_ringbuffer_destroy(pipe->fifo);
-                pipe->fifo = RT_NULL;
-            }
-            rt_free(pipe);
-        }
-        else
-        {
-            result = -ENODEV;
-        }
-    }
-    else
+    /* close fifo ringbuffer */
+    if (pipe->fifo)
     {
-        result = -ENODEV;
+        rt_ringbuffer_destroy(pipe->fifo);
+        pipe->fifo = RT_NULL;
     }
+    rt_free(pipe);
 
-    return result;
+    return 0;
 }
 
 #if defined(RT_USING_POSIX_DEVIO) && defined(RT_USING_POSIX_PIPE)
@@ -762,13 +752,15 @@ int pipe(int fildes[2])
     fildes[1] = open(dev_name, O_WRONLY, 0);
     if (fildes[1] < 0)
     {
-        close(fildes[0]);
+        rt_pipe_delete(dname);
         return -1;
     }
 
     fildes[0] = open(dev_name, O_RDONLY, 0);
     if (fildes[0] < 0)
     {
+        close(fildes[1]);
+        rt_pipe_delete(dname);
         return -1;
     }
 
