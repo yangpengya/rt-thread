@@ -28,7 +28,7 @@ rt_err_t rt_i2c_bus_device_register(struct rt_i2c_bus_device *bus,
 
     if (bus->timeout == 0) bus->timeout = RT_TICK_PER_SECOND;
 
-    res = rt_i2c_bus_device_device_init(bus, bus_name);
+    res = rt_i2c_bus_device_device_init(bus, bus_name, RT_NULL);
 
     LOG_I("I2C bus [%s] registered", bus_name);
 
@@ -44,7 +44,6 @@ rt_err_t rt_i2c_bus_device_register(struct rt_i2c_bus_device *bus,
 
 struct rt_i2c_bus_device *rt_i2c_bus_device_find(const char *bus_name)
 {
-    struct rt_i2c_bus_device *bus;
     rt_device_t dev = rt_device_find(bus_name);
     if (dev == RT_NULL || dev->type != RT_Device_Class_I2CBUS)
     {
@@ -53,9 +52,7 @@ struct rt_i2c_bus_device *rt_i2c_bus_device_find(const char *bus_name)
         return RT_NULL;
     }
 
-    bus = (struct rt_i2c_bus_device *)dev->user_data;
-
-    return bus;
+    return (struct rt_i2c_bus_device *)dev;
 }
 
 rt_ssize_t rt_i2c_transfer(struct rt_i2c_bus_device *bus,

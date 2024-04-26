@@ -27,7 +27,7 @@ static rt_ssize_t i2c_bus_device_read(rt_device_t dev,
 {
     rt_uint16_t addr;
     rt_uint16_t flags;
-    struct rt_i2c_bus_device *bus = (struct rt_i2c_bus_device *)dev->user_data;
+    struct rt_i2c_bus_device *bus = (struct rt_i2c_bus_device *)dev;
 
     RT_ASSERT(bus != RT_NULL);
     RT_ASSERT(buffer != RT_NULL);
@@ -47,7 +47,7 @@ static rt_ssize_t i2c_bus_device_write(rt_device_t dev,
 {
     rt_uint16_t addr;
     rt_uint16_t flags;
-    struct rt_i2c_bus_device *bus = (struct rt_i2c_bus_device *)dev->user_data;
+    struct rt_i2c_bus_device *bus = (struct rt_i2c_bus_device *)dev;
 
     RT_ASSERT(bus != RT_NULL);
     RT_ASSERT(buffer != RT_NULL);
@@ -66,7 +66,7 @@ static rt_err_t i2c_bus_device_control(rt_device_t dev,
 {
     rt_err_t ret;
     struct rt_i2c_priv_data *priv_data;
-    struct rt_i2c_bus_device *bus = (struct rt_i2c_bus_device *)dev->user_data;
+    struct rt_i2c_bus_device *bus = (struct rt_i2c_bus_device *)dev;
 
     RT_ASSERT(bus != RT_NULL);
 
@@ -107,14 +107,13 @@ const static struct rt_device_ops i2c_ops =
 #endif
 
 rt_err_t rt_i2c_bus_device_device_init(struct rt_i2c_bus_device *bus,
-                                       const char               *name)
+                                       const char               *name,
+                                       void                     *user_data)
 {
     struct rt_device *device;
     RT_ASSERT(bus != RT_NULL);
 
     device = &bus->parent;
-
-    device->user_data = bus;
 
     /* set device type */
     device->type    = RT_Device_Class_I2CBUS;
@@ -129,6 +128,7 @@ rt_err_t rt_i2c_bus_device_device_init(struct rt_i2c_bus_device *bus,
     device->write   = i2c_bus_device_write;
     device->control = i2c_bus_device_control;
 #endif
+    device->user_data = user_data;
 
     /* register to device manager */
     rt_device_register(device, name, RT_DEVICE_FLAG_RDWR);

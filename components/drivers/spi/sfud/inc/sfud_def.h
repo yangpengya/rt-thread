@@ -35,6 +35,7 @@
 #include <stdbool.h>
 #include <sfud_cfg.h>
 #include "sfud_flash_def.h"
+#include "spi_flash.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -245,8 +246,8 @@ typedef struct {
  * SPI device
  */
 typedef struct __sfud_spi {
-    /* SPI device name */
-    char *name;
+    /* SPI flash device */
+    struct spi_flash_device flash_device;
     /* SPI bus write read data function */
     sfud_err (*wr)(const struct __sfud_spi *spi, const uint8_t *write_buf, size_t write_size, uint8_t *read_buf,
                    size_t read_size);
@@ -267,10 +268,10 @@ typedef struct __sfud_spi {
  * serial flash device
  */
 typedef struct {
-    char *name;                                  /**< serial flash name */
+    sfud_spi spi;                                /**< SPI flash device */
+    char name[RT_NAME_MAX];                      /**< serial flash name */
     size_t index;                                /**< index of flash device information table  @see flash_table */
     sfud_flash_chip chip;                        /**< flash chip information */
-    sfud_spi spi;                                /**< SPI device */
     bool init_ok;                                /**< initialize OK flag */
     bool addr_in_4_byte;                         /**< flash is in 4-Byte addressing */
     struct {

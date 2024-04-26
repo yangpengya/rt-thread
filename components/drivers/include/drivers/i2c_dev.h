@@ -35,7 +35,8 @@ struct rt_i2c_priv_data
 };
 
 rt_err_t rt_i2c_bus_device_device_init(struct rt_i2c_bus_device *bus,
-                                       const char               *name);
+                                       const char               *name,
+                                       void                     *user_data);
 
 #ifdef __cplusplus
 }

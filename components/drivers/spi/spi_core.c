@@ -20,7 +20,7 @@
 #include <rtdbg.h>
 
 extern rt_err_t rt_spi_bus_device_init(struct rt_spi_bus *bus, const char *name);
-extern rt_err_t rt_spidev_device_init(struct rt_spi_device *dev, const char *name);
+extern rt_err_t rt_spidev_device_init(struct rt_spi_device *dev, const char *name, void *user_data);
 
 rt_err_t rt_spi_bus_register(struct rt_spi_bus       *bus,
                              const char              *name,
@@ -60,7 +60,7 @@ rt_err_t rt_spi_bus_attach_device_cspin(struct rt_spi_device *device,
         device->bus = (struct rt_spi_bus *)bus;
 
         /* initialize spidev device */
-        result = rt_spidev_device_init(device, name);
+        result = rt_spidev_device_init(device, name, user_data);
         if (result != RT_EOK)
             return result;
 
@@ -70,7 +70,6 @@ rt_err_t rt_spi_bus_attach_device_cspin(struct rt_spi_device *device,
         }
 
         rt_memset(&device->config, 0, sizeof(device->config));
-        device->parent.user_data = user_data;
         device->cs_pin = cs_pin;
         return RT_EOK;
     }

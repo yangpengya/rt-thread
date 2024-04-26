@@ -132,7 +132,7 @@ const static struct rt_device_ops spi_device_ops =
 };
 #endif
 
-rt_err_t rt_spidev_device_init(struct rt_spi_device *dev, const char *name)
+rt_err_t rt_spidev_device_init(struct rt_spi_device *dev, const char *name, void *user_data)
 {
     struct rt_device *device;
     RT_ASSERT(dev != RT_NULL);
@@ -151,6 +151,7 @@ rt_err_t rt_spidev_device_init(struct rt_spi_device *dev, const char *name)
     device->write   = _spidev_device_write;
     device->control = _spidev_device_control;
 #endif
+    device->user_data = user_data;
 
     /* register to device manager */
     return rt_device_register(device, name, RT_DEVICE_FLAG_RDWR);
